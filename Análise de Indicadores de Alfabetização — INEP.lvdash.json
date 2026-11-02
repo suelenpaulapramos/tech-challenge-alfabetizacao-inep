@@ -1,0 +1,1079 @@
+{
+  "datasets": [
+    {
+      "name": "ds_situacao_municipio",
+      "displayName": "Distribuição por Situação da Meta",
+      "queryLines": [
+        "SELECT\n",
+        "  situacao_meta,\n",
+        "  COUNT(*) AS total\n",
+        "FROM\n",
+        "  workspace.gold.ft_meta_vs_resultado_municipio\n",
+        "GROUP BY\n",
+        "  situacao_meta\n",
+        "ORDER BY\n",
+        "  total DESC"
+      ]
+    },
+    {
+      "name": "ds_faixas",
+      "displayName": "Distribuição por Faixa de Taxa",
+      "queryLines": [
+        "SELECT\n",
+        "  CASE\n",
+        "    WHEN taxa_alfabetizacao < 50 THEN '0-50%'\n",
+        "    WHEN taxa_alfabetizacao < 70 THEN '50-70%'\n",
+        "    WHEN taxa_alfabetizacao < 90 THEN '70-90%'\n",
+        "    ELSE '90-100%'\n",
+        "  END AS faixa,\n",
+        "  COUNT(*) AS total\n",
+        "FROM\n",
+        "  workspace.gold.ft_meta_vs_resultado_municipio\n",
+        "WHERE\n",
+        "  taxa_alfabetizacao IS NOT NULL\n",
+        "GROUP BY\n",
+        "  faixa\n",
+        "ORDER BY\n",
+        "  faixa"
+      ]
+    },
+    {
+      "name": "ds_scatter",
+      "displayName": "Taxa vs Meta por Município",
+      "queryLines": [
+        "SELECT\n",
+        "  taxa_alfabetizacao,\n",
+        "  meta_alfabetizacao\n",
+        "FROM\n",
+        "  workspace.gold.ft_meta_vs_resultado_municipio\n",
+        "WHERE\n",
+        "  taxa_alfabetizacao IS NOT NULL\n",
+        "  AND meta_alfabetizacao IS NOT NULL"
+      ]
+    },
+    {
+      "name": "ds_top_municipios",
+      "displayName": "Top 20 Municípios",
+      "queryLines": [
+        "SELECT\n",
+        "  id_municipio,\n",
+        "  taxa_alfabetizacao,\n",
+        "  meta_alfabetizacao,\n",
+        "  situacao_meta\n",
+        "FROM\n",
+        "  workspace.gold.ft_meta_vs_resultado_municipio\n",
+        "WHERE\n",
+        "  taxa_alfabetizacao IS NOT NULL\n",
+        "ORDER BY\n",
+        "  taxa_alfabetizacao DESC\n",
+        "LIMIT 20"
+      ]
+    },
+    {
+      "name": "ds_situacao_rede",
+      "displayName": "Situação da Meta por Rede",
+      "queryLines": [
+        "SELECT\n",
+        "  r.descricao_rede,\n",
+        "  m.situacao_meta,\n",
+        "  COUNT(*) AS total\n",
+        "FROM\n",
+        "  workspace.gold.ft_meta_vs_resultado_municipio m\n",
+        "    JOIN workspace.gold.dim_rede r\n",
+        "      ON m.rede_codigo = r.rede_codigo\n",
+        "GROUP BY\n",
+        "  r.descricao_rede,\n",
+        "  m.situacao_meta\n",
+        "ORDER BY\n",
+        "  r.descricao_rede,\n",
+        "  total DESC"
+      ]
+    },
+    {
+      "name": "ds_kpis",
+      "displayName": "KPIs Nacionais",
+      "queryLines": [
+        "SELECT\n",
+        "  COUNT(DISTINCT id_municipio) AS total_municipios,\n",
+        "  SUM(\n",
+        "    CASE\n",
+        "      WHEN situacao_meta = 'ATINGIU_OU_SUPEROU' THEN 1\n",
+        "      ELSE 0\n",
+        "    END\n",
+        "  ) AS linhas_atingiram,\n",
+        "  SUM(\n",
+        "    CASE\n",
+        "      WHEN situacao_meta IN ('ATINGIU_OU_SUPEROU', 'ABAIXO_DA_META') THEN 1\n",
+        "      ELSE 0\n",
+        "    END\n",
+        "  ) AS linhas_comparaveis,\n",
+        "  ROUND(\n",
+        "    100.0\n",
+        "      * SUM(\n",
+        "        CASE\n",
+        "          WHEN situacao_meta = 'ATINGIU_OU_SUPEROU' THEN 1\n",
+        "          ELSE 0\n",
+        "        END\n",
+        "      )\n",
+        "      / NULLIF(\n",
+        "        SUM(\n",
+        "          CASE\n",
+        "            WHEN situacao_meta IN ('ATINGIU_OU_SUPEROU', 'ABAIXO_DA_META') THEN 1\n",
+        "            ELSE 0\n",
+        "          END\n",
+        "        ),\n",
+        "        0\n",
+        "      ),\n",
+        "    1\n",
+        "  ) AS pct_atingiu,\n",
+        "  COUNT(DISTINCT\n",
+        "    CASE\n",
+        "      WHEN situacao_meta = 'ATINGIU_OU_SUPEROU' THEN id_municipio\n",
+        "    END\n",
+        "  ) AS municipios_atingiram,\n",
+        "  ROUND(\n",
+        "    100.0\n",
+        "      * COUNT(DISTINCT\n",
+        "        CASE\n",
+        "          WHEN situacao_meta = 'ATINGIU_OU_SUPEROU' THEN id_municipio\n",
+        "        END\n",
+        "      )\n",
+        "      / NULLIF(\n",
+        "        COUNT(DISTINCT\n",
+        "          CASE\n",
+        "            WHEN situacao_meta IN ('ATINGIU_OU_SUPEROU', 'ABAIXO_DA_META') THEN id_municipio\n",
+        "          END\n",
+        "        ),\n",
+        "        0\n",
+        "      ),\n",
+        "    1\n",
+        "  ) AS pct_atingiu_municipios,\n",
+        "  ROUND(AVG(taxa_alfabetizacao), 1) AS taxa_media_simples_municipios\n",
+        "FROM\n",
+        "  workspace.gold.ft_meta_vs_resultado_municipio"
+      ]
+    },
+    {
+      "name": "ds_taxa_rede",
+      "displayName": "Taxa por Rede de Ensino",
+      "queryLines": [
+        "SELECT\n",
+        "  r.descricao_rede,\n",
+        "  ROUND(AVG(f.taxa_alfabetizacao), 1) AS taxa_alfabetizacao\n",
+        "FROM\n",
+        "  workspace.gold.ft_resultado_uf f\n",
+        "    JOIN workspace.gold.dim_rede r\n",
+        "      ON f.rede_codigo = r.rede_codigo\n",
+        "GROUP BY\n",
+        "  r.descricao_rede\n",
+        "ORDER BY\n",
+        "  taxa_alfabetizacao DESC"
+      ]
+    },
+    {
+      "name": "ds_taxa_regiao",
+      "displayName": "Taxa por Região",
+      "queryLines": [
+        "SELECT\n",
+        "  u.regiao,\n",
+        "  ROUND(AVG(f.taxa_alfabetizacao), 1) AS taxa_alfabetizacao\n",
+        "FROM\n",
+        "  workspace.gold.ft_resultado_uf f\n",
+        "    JOIN workspace.gold.dim_uf u\n",
+        "      ON f.sigla_uf = u.sigla_uf\n",
+        "GROUP BY\n",
+        "  u.regiao\n",
+        "ORDER BY\n",
+        "  taxa_alfabetizacao DESC"
+      ]
+    },
+    {
+      "name": "ds_bottom_municipios",
+      "displayName": "Bottom 20 Municípios",
+      "queryLines": [
+        "SELECT\n",
+        "  id_municipio,\n",
+        "  taxa_alfabetizacao,\n",
+        "  meta_alfabetizacao,\n",
+        "  situacao_meta\n",
+        "FROM\n",
+        "  workspace.gold.ft_meta_vs_resultado_municipio\n",
+        "WHERE\n",
+        "  taxa_alfabetizacao IS NOT NULL\n",
+        "ORDER BY\n",
+        "  taxa_alfabetizacao ASC\n",
+        "LIMIT 20"
+      ]
+    },
+    {
+      "name": "ds_taxa_uf",
+      "displayName": "Taxa de Alfabetização por UF",
+      "queryLines": [
+        "SELECT\n",
+        "  f.sigla_uf,\n",
+        "  u.nome_uf,\n",
+        "  u.regiao,\n",
+        "  ROUND(AVG(f.taxa_alfabetizacao), 1) AS taxa_alfabetizacao\n",
+        "FROM\n",
+        "  workspace.gold.ft_resultado_uf f\n",
+        "    JOIN workspace.gold.dim_uf u\n",
+        "      ON f.sigla_uf = u.sigla_uf\n",
+        "GROUP BY\n",
+        "  f.sigla_uf,\n",
+        "  u.nome_uf,\n",
+        "  u.regiao\n",
+        "ORDER BY\n",
+        "  taxa_alfabetizacao DESC"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "c4f28960",
+      "displayName": "Visão Geral Nacional",
+      "layout": [
+        {
+          "widget": {
+            "name": "header_visao_geral",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Visão Geral Nacional — Indicadores de Alfabetização INEP\n",
+                "\n",
+                "Taxa de alfabetização, metas vs resultados e distribuição por UF, região e rede de ensino."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "counter_taxa_media",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_kpis",
+                  "fields": [
+                    {
+                      "name": "taxa_media_simples_municipios",
+                      "expression": "`taxa_media_simples_municipios`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Taxa de Alfabetização Média",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "taxa_media_simples_municipios",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "counter_total_municipios",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_kpis",
+                  "fields": [
+                    {
+                      "name": "total_municipios",
+                      "expression": "`total_municipios`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Municípios Avaliados",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "total_municipios",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "counter_atingiram",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_kpis",
+                  "fields": [
+                    {
+                      "name": "municipios_atingiram",
+                      "expression": "`municipios_atingiram`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Municípios que Atingiram a Meta",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "municipios_atingiram",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "counter_pct_atingiu",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_kpis",
+                  "fields": [
+                    {
+                      "name": "pct_atingiu",
+                      "expression": "`pct_atingiu`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "% de Linhas que Atingiram a Meta (comparáveis)"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "pct_atingiu",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_taxa_uf",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_taxa_uf",
+                  "fields": [
+                    {
+                      "name": "sigla_uf",
+                      "expression": "`sigla_uf`"
+                    },
+                    {
+                      "name": "taxa_alfabetizacao",
+                      "expression": "`taxa_alfabetizacao`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Taxa de Alfabetização por UF",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "sigla_uf",
+                  "displayName": "sigla_uf",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "taxa_alfabetizacao",
+                  "displayName": "taxa_alfabetizacao",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "sigla_uf",
+                  "displayName": "sigla_uf",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_situacao",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_situacao_municipio",
+                  "fields": [
+                    {
+                      "name": "situacao_meta",
+                      "expression": "`situacao_meta`"
+                    },
+                    {
+                      "name": "total",
+                      "expression": "`total`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Distribuição de Municípios por Situação da Meta",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "situacao_meta",
+                  "displayName": "situacao_meta",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "total",
+                  "displayName": "total",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "situacao_meta",
+                  "displayName": "situacao_meta",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 5,
+            "width": 6,
+            "height": 7
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "analise_municipio",
+      "displayName": "Análise por Município",
+      "layout": [
+        {
+          "widget": {
+            "name": "header_municipio",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Análise por Município\n",
+                "\n",
+                "Top e bottom municípios por taxa de alfabetização, distribuição por faixa e comparação taxa vs meta."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_faixas",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_faixas",
+                  "fields": [
+                    {
+                      "name": "faixa",
+                      "expression": "`faixa`"
+                    },
+                    {
+                      "name": "total",
+                      "expression": "`total`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Distribuição por Faixa de Taxa de Alfabetização",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "faixa",
+                  "displayName": "faixa",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "total",
+                  "displayName": "total",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "faixa",
+                  "displayName": "faixa",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "table_top20",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_top_municipios",
+                  "fields": [
+                    {
+                      "name": "id_municipio",
+                      "expression": "`id_municipio`"
+                    },
+                    {
+                      "name": "taxa_alfabetizacao",
+                      "expression": "`taxa_alfabetizacao`"
+                    },
+                    {
+                      "name": "meta_alfabetizacao",
+                      "expression": "`meta_alfabetizacao`"
+                    },
+                    {
+                      "name": "situacao_meta",
+                      "expression": "`situacao_meta`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Top 20 Municípios com Maior Taxa"
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "id_municipio"
+                  },
+                  {
+                    "fieldName": "taxa_alfabetizacao"
+                  },
+                  {
+                    "fieldName": "meta_alfabetizacao"
+                  },
+                  {
+                    "fieldName": "situacao_meta"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 8,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "table_bottom20",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_bottom_municipios",
+                  "fields": [
+                    {
+                      "name": "id_municipio",
+                      "expression": "`id_municipio`"
+                    },
+                    {
+                      "name": "taxa_alfabetizacao",
+                      "expression": "`taxa_alfabetizacao`"
+                    },
+                    {
+                      "name": "meta_alfabetizacao",
+                      "expression": "`meta_alfabetizacao`"
+                    },
+                    {
+                      "name": "situacao_meta",
+                      "expression": "`situacao_meta`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Bottom 20 Municípios com Menor Taxa"
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "id_municipio"
+                  },
+                  {
+                    "fieldName": "taxa_alfabetizacao"
+                  },
+                  {
+                    "fieldName": "meta_alfabetizacao"
+                  },
+                  {
+                    "fieldName": "situacao_meta"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 8,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "scatter_taxa_meta",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_scatter",
+                  "fields": [
+                    {
+                      "name": "meta_alfabetizacao",
+                      "expression": "`meta_alfabetizacao`"
+                    },
+                    {
+                      "name": "taxa_alfabetizacao",
+                      "expression": "`taxa_alfabetizacao`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Taxa de Alfabetização vs Meta"
+              },
+              "version": 3,
+              "widgetType": "scatter",
+              "encodings": {
+                "x": {
+                  "fieldName": "meta_alfabetizacao",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "taxa_alfabetizacao",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 6,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "analise_rede",
+      "displayName": "Análise por Rede de Ensino",
+      "layout": [
+        {
+          "widget": {
+            "name": "header_rede",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Análise por Rede de Ensino\n",
+                "\n",
+                "Taxa de alfabetização e situação da meta por tipo de rede (pública, privada, estadual, municipal, federal)."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_taxa_rede",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_taxa_rede",
+                  "fields": [
+                    {
+                      "name": "descricao_rede",
+                      "expression": "`descricao_rede`"
+                    },
+                    {
+                      "name": "taxa_alfabetizacao",
+                      "expression": "`taxa_alfabetizacao`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Taxa de Alfabetização Média por Rede",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "descricao_rede",
+                  "displayName": "descricao_rede",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "taxa_alfabetizacao",
+                  "displayName": "taxa_alfabetizacao",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "descricao_rede",
+                  "displayName": "descricao_rede",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_situacao_rede",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_situacao_rede",
+                  "fields": [
+                    {
+                      "name": "situacao_meta",
+                      "expression": "`situacao_meta`"
+                    },
+                    {
+                      "name": "descricao_rede",
+                      "expression": "`descricao_rede`"
+                    },
+                    {
+                      "name": "total",
+                      "expression": "`total`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Situação da Meta por Rede",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "descricao_rede",
+                  "displayName": "descricao_rede",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "total",
+                  "displayName": "total",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "situacao_meta",
+                  "displayName": "situacao_meta",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "table_detalhe_rede",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_situacao_rede",
+                  "fields": [
+                    {
+                      "name": "descricao_rede",
+                      "expression": "`descricao_rede`"
+                    },
+                    {
+                      "name": "situacao_meta",
+                      "expression": "`situacao_meta`"
+                    },
+                    {
+                      "name": "total",
+                      "expression": "`total`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Detalhe por Rede e Situação"
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "descricao_rede"
+                  },
+                  {
+                    "fieldName": "situacao_meta"
+                  },
+                  {
+                    "fieldName": "total"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 8,
+            "width": 12,
+            "height": 5
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "applyModeEnabled": false
+  }
+}
