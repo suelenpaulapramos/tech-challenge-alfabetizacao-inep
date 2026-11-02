@@ -1,0 +1,880 @@
+{
+  "datasets": [
+    {
+      "name": "ds_execucoes_camada",
+      "displayName": "Execuções por camada (7 dias)",
+      "queryLines": [
+        "SELECT\n",
+        "  layer,\n",
+        "  COUNT(*) AS num_execucoes,\n",
+        "  SUM(row_count) AS total_registros\n",
+        "FROM\n",
+        "  workspace.monitoring.pipeline_runs\n",
+        "WHERE\n",
+        "  started_at >= DATE_SUB(CURRENT_DATE(), 7)\n",
+        "GROUP BY\n",
+        "  layer"
+      ]
+    },
+    {
+      "name": "ds_execucoes_7d",
+      "displayName": "Resumo de execuções (7 dias)",
+      "queryLines": [
+        "SELECT\n",
+        "  COUNT(*) AS total_execucoes,\n",
+        "  SUM(\n",
+        "    CASE\n",
+        "      WHEN status = 'FALHA' THEN 1\n",
+        "      ELSE 0\n",
+        "    END\n",
+        "  ) AS total_falhas,\n",
+        "  SUM(row_count) AS total_registros\n",
+        "FROM\n",
+        "  workspace.monitoring.pipeline_runs\n",
+        "WHERE\n",
+        "  started_at >= DATE_SUB(CURRENT_DATE(), 7)"
+      ]
+    },
+    {
+      "name": "ds_dq_resumo_7d",
+      "displayName": "Resumo DQ (7 dias)",
+      "queryLines": [
+        "SELECT\n",
+        "  COUNT(*) AS total_verificacoes,\n",
+        "  SUM(\n",
+        "    CASE\n",
+        "      WHEN status = 'PASSOU' THEN 1\n",
+        "      ELSE 0\n",
+        "    END\n",
+        "  ) AS aprovadas,\n",
+        "  SUM(\n",
+        "    CASE\n",
+        "      WHEN status = 'FALHOU' THEN 1\n",
+        "      ELSE 0\n",
+        "    END\n",
+        "  ) AS falhas\n",
+        "FROM\n",
+        "  workspace.monitoring.qualidade_resultados\n",
+        "WHERE\n",
+        "  checked_at >= DATE_SUB(CURRENT_DATE(), 7)"
+      ]
+    },
+    {
+      "name": "ds_timeline_7d",
+      "displayName": "Timeline Execuções 7 dias",
+      "queryLines": [
+        "SELECT\n",
+        "  DATE(started_at) AS data_execucao,\n",
+        "  layer,\n",
+        "  COUNT(*) AS num_execucoes,\n",
+        "  SUM(row_count) AS total_registros\n",
+        "FROM\n",
+        "  workspace.monitoring.pipeline_runs\n",
+        "WHERE\n",
+        "  started_at >= DATE_SUB(CURRENT_DATE(), 7)\n",
+        "GROUP BY\n",
+        "  DATE(started_at),\n",
+        "  layer\n",
+        "ORDER BY\n",
+        "  data_execucao,\n",
+        "  layer"
+      ]
+    },
+    {
+      "name": "ds_dq_falhas",
+      "displayName": "DQ Falhas por Regra (7d)",
+      "queryLines": [
+        "SELECT\n",
+        "  rule_name,\n",
+        "  severity,\n",
+        "  SUM(failed_rows) AS total_registros_falha,\n",
+        "  COUNT(*) AS num_falhas\n",
+        "FROM\n",
+        "  workspace.monitoring.qualidade_resultados\n",
+        "WHERE\n",
+        "  status = 'FALHOU'\n",
+        "  AND checked_at >= DATE_SUB(CURRENT_DATE(), 7)\n",
+        "GROUP BY\n",
+        "  rule_name,\n",
+        "  severity\n",
+        "ORDER BY\n",
+        "  total_registros_falha DESC"
+      ]
+    },
+    {
+      "name": "ds_ultimas_10",
+      "displayName": "Últimas 10 Execuções",
+      "queryLines": [
+        "SELECT\n",
+        "  run_id,\n",
+        "  layer,\n",
+        "  entity,\n",
+        "  started_at,\n",
+        "  finished_at,\n",
+        "  ROUND(duration_seconds, 1) AS duracao_seg,\n",
+        "  status,\n",
+        "  row_count,\n",
+        "  error_message\n",
+        "FROM\n",
+        "  workspace.monitoring.pipeline_runs\n",
+        "ORDER BY\n",
+        "  started_at DESC\n",
+        "LIMIT 10"
+      ]
+    },
+    {
+      "name": "ds_dq_aprovacao_camada",
+      "displayName": "Taxa de aprovação DQ por camada (7 dias)",
+      "queryLines": [
+        "SELECT\n",
+        "  layer,\n",
+        "  COUNT(*) AS total_verificacoes,\n",
+        "  SUM(\n",
+        "    CASE\n",
+        "      WHEN status = 'PASSOU' THEN 1\n",
+        "      ELSE 0\n",
+        "    END\n",
+        "  ) AS aprovadas,\n",
+        "  ROUND(\n",
+        "    100.0\n",
+        "      * SUM(\n",
+        "        CASE\n",
+        "          WHEN status = 'PASSOU' THEN 1\n",
+        "          ELSE 0\n",
+        "        END\n",
+        "      )\n",
+        "      / COUNT(*),\n",
+        "    1\n",
+        "  ) AS taxa_aprovacao_pct\n",
+        "FROM\n",
+        "  workspace.monitoring.qualidade_resultados\n",
+        "WHERE\n",
+        "  checked_at >= DATE_SUB(CURRENT_DATE(), 7)\n",
+        "GROUP BY\n",
+        "  layer\n",
+        "ORDER BY\n",
+        "  layer"
+      ]
+    },
+    {
+      "name": "ds_dq_detalhes",
+      "displayName": "Verificações DQ recentes",
+      "queryLines": [
+        "SELECT\n",
+        "  execution_id,\n",
+        "  layer,\n",
+        "  table_name,\n",
+        "  rule_name,\n",
+        "  severity,\n",
+        "  checked_at,\n",
+        "  failed_rows,\n",
+        "  status,\n",
+        "  details\n",
+        "FROM\n",
+        "  workspace.monitoring.qualidade_resultados\n",
+        "ORDER BY\n",
+        "  checked_at DESC\n",
+        "LIMIT 20"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "db97c78b",
+      "displayName": "Saúde do Pipeline",
+      "layout": [
+        {
+          "widget": {
+            "name": "ctr_execucoes_7d",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_execucoes_7d",
+                  "fields": [
+                    {
+                      "name": "sum(total_execucoes)",
+                      "expression": "SUM(`total_execucoes`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Execuções (últimos 7 dias)"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_execucoes)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "ctr_falhas_7d",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_execucoes_7d",
+                  "fields": [
+                    {
+                      "name": "sum(total_falhas)",
+                      "expression": "SUM(`total_falhas`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Falhas (últimos 7 dias)"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_falhas)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 0,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_execucoes_camada",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_execucoes_camada",
+                  "fields": [
+                    {
+                      "name": "layer",
+                      "expression": "`layer`"
+                    },
+                    {
+                      "name": "sum(num_execucoes)",
+                      "expression": "SUM(`num_execucoes`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Execuções por camada (7 dias)"
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "layer",
+                  "displayName": "layer",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(num_execucoes)",
+                  "displayName": "num_execucoes",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "layer",
+                  "displayName": "layer",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 0,
+            "width": 6,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "ln_execucoes_dia",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_timeline_7d",
+                  "fields": [
+                    {
+                      "name": "layer",
+                      "expression": "`layer`"
+                    },
+                    {
+                      "name": "data_execucao",
+                      "expression": "`data_execucao`"
+                    },
+                    {
+                      "name": "sum(num_execucoes)",
+                      "expression": "SUM(`num_execucoes`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Execuções por dia e camada (7 dias)"
+              },
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "data_execucao",
+                  "displayName": "data_execucao",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(num_execucoes)",
+                  "displayName": "num_execucoes",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "layer",
+                  "displayName": "layer",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 12,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "tbl_ultimas_10",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_ultimas_10",
+                  "fields": [
+                    {
+                      "name": "run_id",
+                      "expression": "`run_id`"
+                    },
+                    {
+                      "name": "layer",
+                      "expression": "`layer`"
+                    },
+                    {
+                      "name": "entity",
+                      "expression": "`entity`"
+                    },
+                    {
+                      "name": "started_at",
+                      "expression": "`started_at`"
+                    },
+                    {
+                      "name": "finished_at",
+                      "expression": "`finished_at`"
+                    },
+                    {
+                      "name": "duracao_seg",
+                      "expression": "`duracao_seg`"
+                    },
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    },
+                    {
+                      "name": "row_count",
+                      "expression": "`row_count`"
+                    },
+                    {
+                      "name": "error_message",
+                      "expression": "`error_message`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Últimas 10 execuções"
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "run_id"
+                  },
+                  {
+                    "fieldName": "layer"
+                  },
+                  {
+                    "fieldName": "entity"
+                  },
+                  {
+                    "fieldName": "started_at"
+                  },
+                  {
+                    "fieldName": "finished_at"
+                  },
+                  {
+                    "fieldName": "duracao_seg"
+                  },
+                  {
+                    "fieldName": "status"
+                  },
+                  {
+                    "fieldName": "row_count"
+                  },
+                  {
+                    "fieldName": "error_message"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 7,
+            "width": 12,
+            "height": 5
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "qualidade_dados",
+      "displayName": "Qualidade de Dados",
+      "layout": [
+        {
+          "widget": {
+            "name": "ctr_dq_total",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_dq_resumo_7d",
+                  "fields": [
+                    {
+                      "name": "sum(total_verificacoes)",
+                      "expression": "SUM(`total_verificacoes`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Verificações DQ (7 dias)"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_verificacoes)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "ctr_dq_aprovadas",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_dq_resumo_7d",
+                  "fields": [
+                    {
+                      "name": "sum(aprovadas)",
+                      "expression": "SUM(`aprovadas`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Aprovadas (7 dias)"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(aprovadas)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "ctr_dq_falhas",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_dq_resumo_7d",
+                  "fields": [
+                    {
+                      "name": "sum(falhas)",
+                      "expression": "SUM(`falhas`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Falhas (7 dias)"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(falhas)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 0,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_dq_aprovacao_camada",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_dq_aprovacao_camada",
+                  "fields": [
+                    {
+                      "name": "layer",
+                      "expression": "`layer`"
+                    },
+                    {
+                      "name": "sum(taxa_aprovacao_pct)",
+                      "expression": "SUM(`taxa_aprovacao_pct`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Taxa de aprovação por camada (%) — 7 dias"
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "layer",
+                  "displayName": "layer",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(taxa_aprovacao_pct)",
+                  "displayName": "taxa_aprovacao_pct",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "layer",
+                  "displayName": "layer",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 6,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_dq_falhas_regra",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_dq_falhas",
+                  "fields": [
+                    {
+                      "name": "rule_name",
+                      "expression": "`rule_name`"
+                    },
+                    {
+                      "name": "sum(total_registros_falha)",
+                      "expression": "SUM(`total_registros_falha`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Falhas por regra (7 dias)"
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "rule_name",
+                  "displayName": "rule_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(total_registros_falha)",
+                  "displayName": "total_registros_falha",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "rule_name",
+                  "displayName": "rule_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 3,
+            "width": 6,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "tbl_dq_detalhes",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_dq_detalhes",
+                  "fields": [
+                    {
+                      "name": "checked_at",
+                      "expression": "`checked_at`"
+                    },
+                    {
+                      "name": "layer",
+                      "expression": "`layer`"
+                    },
+                    {
+                      "name": "table_name",
+                      "expression": "`table_name`"
+                    },
+                    {
+                      "name": "rule_name",
+                      "expression": "`rule_name`"
+                    },
+                    {
+                      "name": "severity",
+                      "expression": "`severity`"
+                    },
+                    {
+                      "name": "failed_rows",
+                      "expression": "`failed_rows`"
+                    },
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    },
+                    {
+                      "name": "execution_id",
+                      "expression": "`execution_id`"
+                    },
+                    {
+                      "name": "details",
+                      "expression": "`details`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Verificações DQ recentes"
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "checked_at"
+                  },
+                  {
+                    "fieldName": "layer"
+                  },
+                  {
+                    "fieldName": "table_name"
+                  },
+                  {
+                    "fieldName": "rule_name"
+                  },
+                  {
+                    "fieldName": "severity"
+                  },
+                  {
+                    "fieldName": "failed_rows"
+                  },
+                  {
+                    "fieldName": "status"
+                  },
+                  {
+                    "fieldName": "execution_id"
+                  },
+                  {
+                    "fieldName": "details"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 7,
+            "width": 12,
+            "height": 5
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "applyModeEnabled": false
+  }
+}
