@@ -1,0 +1,34 @@
+{
+  "evaluation": {
+    "source": {
+      "name": "joins_falharam"
+    },
+    "comparison_operator": "GREATER_THAN",
+    "threshold": {
+      "value": {
+        "double_value": 0.0
+      }
+    },
+    "notification": {
+      "retrigger_seconds": 0,
+      "notify_on_ok": true
+    }
+  },
+  "schedule": {
+    "quartz_cron_schedule": "0 0 * * * ?",
+    "timezone_id": "America/Bahia"
+  },
+  "query_lines": [
+    "SELECT COUNT(*) AS joins_falharam",
+    "FROM workspace.monitoring.qualidade_resultados",
+    "WHERE rule_name = 'TAXA_CORRESPONDENCIA_JOIN'",
+    "  AND status = 'FALHOU'",
+    "  AND layer <> 'GOLD_DEMO'",
+    "  AND checked_at >= (",
+    "    SELECT MAX(checked_at)",
+    "    FROM workspace.monitoring.qualidade_resultados",
+    "    WHERE rule_name = 'TAXA_CORRESPONDENCIA_JOIN'",
+    "      AND layer <> 'GOLD_DEMO'",
+    "  )"
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "evaluation": {
+    "source": {
+      "name": "entidades_variacao_anormal"
+    },
+    "comparison_operator": "GREATER_THAN",
+    "threshold": {
+      "value": {
+        "double_value": 0.0
+      }
+    },
+    "notification": {
+      "retrigger_seconds": 0,
+      "notify_on_ok": true
+    }
+  },
+  "schedule": {
+    "quartz_cron_schedule": "0 0 * * * ?",
+    "timezone_id": "America/Bahia"
+  },
+  "query_lines": [
+    "SELECT COUNT(*) AS entidades_variacao_anormal",
+    "FROM (",
+    "  SELECT",
+    "    curr.entity,",
+    "    curr.row_count AS curr_rows,",
+    "    prev.row_count AS prev_rows,",
+    "    ABS(curr.row_count - prev.row_count) / NULLIF(prev.row_count, 0) * 100 AS variacao_pct",
+    "  FROM (",
+    "    SELECT entity, row_count, started_at,",
+    "           ROW_NUMBER() OVER (PARTITION BY entity ORDER BY started_at DESC) AS rn",
+    "    FROM workspace.monitoring.pipeline_runs",
+    "    WHERE status = 'SUCESSO'",
+    "  ) curr",
+    "  JOIN (",
+    "    SELECT entity, row_count, started_at,",
+    "           ROW_NUMBER() OVER (PARTITION BY entity ORDER BY started_at DESC) AS rn",
+    "    FROM workspace.monitoring.pipeline_runs",
+    "    WHERE status = 'SUCESSO'",
+    "  ) prev ON curr.entity = prev.entity AND prev.rn = 2",
+    "  WHERE curr.rn = 1",
+    ")",
+    "WHERE variacao_pct > 20"
+  ]
+}
