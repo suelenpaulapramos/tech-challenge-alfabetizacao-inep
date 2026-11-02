@@ -1,0 +1,34 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: SNS + EventBridge para notificar falha do orquestrador Step Functions (NÃO implantado/testado pelo autor).
+Parameters:
+  StateMachineArn: { Type: String }
+  EmailAlerta: { Type: String }
+Resources:
+  TopicoAlerta:
+    Type: AWS::SNS::Topic
+  Assinatura:
+    Type: AWS::SNS::Subscription
+    Properties: { TopicArn: !Ref TopicoAlerta, Protocol: email, Endpoint: !Ref EmailAlerta }
+  RegraFalha:
+    Type: AWS::Events::Rule
+    Properties:
+      EventPattern:
+        source: [aws.states]
+        detail-type: [Step Functions Execution Status Change]
+        detail:
+          status: [FAILED, TIMED_OUT, ABORTED]
+          stateMachineArn: [!Ref StateMachineArn]
+      Targets:
+        - Arn: !Ref TopicoAlerta
+          Id: sns
+  PermissaoEventBridge:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics: [!Ref TopicoAlerta]
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: events.amazonaws.com }
+            Action: sns:Publish
+            Resource: !Ref TopicoAlerta

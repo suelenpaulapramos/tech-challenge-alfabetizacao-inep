@@ -1,0 +1,51 @@
+{
+  "Comment": "Orquestrador do pipeline: executa os Jobs Databricks em sequência; qualquer falha interrompe a cadeia (Fail) e dispara o alerta via EventBridge.",
+  "StartAt": "ExecutarJobs",
+  "TimeoutSeconds": 14400,
+  "States": {
+    "ExecutarJobs": {
+      "Type": "Map",
+      "ItemsPath": "$.jobs",
+      "MaxConcurrency": 1,
+      "ItemSelector": {
+        "job_id.$": "$$.Map.Item.Value.job_id",
+        "nome.$": "$$.Map.Item.Value.nome"
+      },
+      "ItemProcessor": {
+        "ProcessorConfig": { "Mode": "INLINE" },
+        "StartAt": "ExecutarJobDatabricks",
+        "States": {
+          "ExecutarJobDatabricks": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::states:startExecution.sync:2",
+            "Parameters": {
+              "StateMachineArn": "${ChildStateMachineArn}",
+              "Input": {
+                "job_id.$": "$.job_id",
+                "nome.$": "$.nome",
+                "AWS_STEP_FUNCTIONS_STARTED_BY_EXECUTION_ID.$": "$$.Execution.Id"
+              }
+            },
+            "Retry": [
+              { "ErrorEquals": ["States.TaskFailed"], "MaxAttempts": 0 },
+              { "ErrorEquals": ["States.Timeout"], "MaxAttempts": 0 }
+            ],
+            "TimeoutSeconds": 7200,
+            "End": true
+          }
+        }
+      },
+      "ResultPath": "$.resultado",
+      "Catch": [
+        { "ErrorEquals": ["States.ALL"], "ResultPath": "$.erro", "Next": "PipelineFalhou" }
+      ],
+      "Next": "PipelineConcluido"
+    },
+    "PipelineConcluido": { "Type": "Succeed" },
+    "PipelineFalhou": {
+      "Type": "Fail",
+      "Error": "PipelineFalhou",
+      "Cause": "Um Job Databricks falhou, expirou ou foi cancelado. Ver execução filha e monitoring.pipeline_runs."
+    }
+  }
+}

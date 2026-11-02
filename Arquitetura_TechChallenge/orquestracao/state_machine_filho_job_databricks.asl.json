@@ -1,0 +1,60 @@
+{
+  "Comment": "Executa UM Job Databricks (run-now) e consulta o status até terminar. Falha se result_state != SUCCESS.",
+  "StartAt": "IniciarJob",
+  "TimeoutSeconds": 7000,
+  "States": {
+    "IniciarJob": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::http:invoke",
+      "Parameters": {
+        "ApiEndpoint": "${DatabricksHost}/api/2.1/jobs/run-now",
+        "Method": "POST",
+        "Authentication": { "ConnectionArn": "${DatabricksConnectionArn}" },
+        "RequestBody": { "job_id.$": "$.job_id" }
+      },
+      "ResultSelector": { "run_id.$": "$.ResponseBody.run_id" },
+      "ResultPath": "$.run",
+      "Retry": [{ "ErrorEquals": ["States.Http.StatusCode.429", "States.Http.StatusCode.503"], "IntervalSeconds": 10, "MaxAttempts": 3, "BackoffRate": 2 }],
+      "Next": "Aguardar"
+    },
+    "Aguardar": { "Type": "Wait", "Seconds": 30, "Next": "ConsultarRun" },
+    "ConsultarRun": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::http:invoke",
+      "Parameters": {
+        "ApiEndpoint": "${DatabricksHost}/api/2.1/jobs/runs/get",
+        "Method": "GET",
+        "Authentication": { "ConnectionArn": "${DatabricksConnectionArn}" },
+        "QueryParameters": { "run_id.$": "States.Format('{}', $.run.run_id)" }
+      },
+      "ResultSelector": {
+        "life_cycle_state.$": "$.ResponseBody.state.life_cycle_state",
+        "result_state.$": "$.ResponseBody.state.result_state",
+        "state_message.$": "$.ResponseBody.state.state_message"
+      },
+      "ResultPath": "$.status",
+      "Retry": [{ "ErrorEquals": ["States.ALL"], "IntervalSeconds": 15, "MaxAttempts": 3, "BackoffRate": 2 }],
+      "Next": "Terminou?"
+    },
+    "Terminou?": {
+      "Type": "Choice",
+      "Choices": [
+        { "Variable": "$.status.life_cycle_state", "StringEquals": "TERMINATED", "Next": "Sucesso?" },
+        { "Variable": "$.status.life_cycle_state", "StringEquals": "SKIPPED", "Next": "JobFalhou" },
+        { "Variable": "$.status.life_cycle_state", "StringEquals": "INTERNAL_ERROR", "Next": "JobFalhou" }
+      ],
+      "Default": "Aguardar"
+    },
+    "Sucesso?": {
+      "Type": "Choice",
+      "Choices": [{ "Variable": "$.status.result_state", "StringEquals": "SUCCESS", "Next": "JobOk" }],
+      "Default": "JobFalhou"
+    },
+    "JobOk": { "Type": "Succeed" },
+    "JobFalhou": {
+      "Type": "Fail",
+      "Error": "JobDatabricksFalhou",
+      "Cause": "Job Databricks terminou sem SUCCESS (ver status.result_state / state_message na execução)."
+    }
+  }
+}
